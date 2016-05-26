@@ -52,8 +52,9 @@ class DBusServiceTest : public testing::Test {
         .WillByDefault(Return(mock_exported_object_.get()));
     dbus_service_.reset(new DBusService(mock_bus_, &mock_nvram_service_,
                                         &mock_ownership_service_));
-    dbus_service_->Register(
-        brillo::dbus_utils::AsyncEventSequencer::GetDefaultCompletionAction());
+    scoped_refptr<brillo::dbus_utils::AsyncEventSequencer> sequencer(
+        new brillo::dbus_utils::AsyncEventSequencer());
+    dbus_service_->RegisterDBusObjectsAsync(sequencer.get());
   }
 
   template <typename RequestProtobufType, typename ReplyProtobufType>
@@ -165,161 +166,165 @@ TEST_F(DBusServiceTest, RemoveOwnerDependency) {
   EXPECT_EQ(STATUS_SUCCESS, reply.status());
 }
 
-TEST_F(DBusServiceTest, DefineNvram) {
+TEST_F(DBusServiceTest, DefineSpace) {
   uint32_t nvram_index = 5;
   size_t nvram_length = 32;
-  DefineNvramRequest request;
+  DefineSpaceRequest request;
   request.set_index(nvram_index);
-  request.set_length(nvram_length);
-  EXPECT_CALL(mock_nvram_service_, DefineNvram(_, _))
+  request.set_size(nvram_length);
+  EXPECT_CALL(mock_nvram_service_, DefineSpace(_, _))
       .WillOnce(Invoke([nvram_index, nvram_length](
-          const DefineNvramRequest& request,
-          const TpmNvramInterface::DefineNvramCallback& callback) {
+          const DefineSpaceRequest& request,
+          const TpmNvramInterface::DefineSpaceCallback& callback) {
         EXPECT_TRUE(request.has_index());
         EXPECT_EQ(nvram_index, request.index());
-        EXPECT_TRUE(request.has_length());
-        EXPECT_EQ(nvram_length, request.length());
-        DefineNvramReply reply;
-        reply.set_status(STATUS_SUCCESS);
+        EXPECT_TRUE(request.has_size());
+        EXPECT_EQ(nvram_length, request.size());
+        DefineSpaceReply reply;
+        reply.set_result(NVRAM_RESULT_SUCCESS);
         callback.Run(reply);
       }));
-  DefineNvramReply reply;
-  ExecuteMethod(kDefineNvram, request, &reply, kTpmNvramInterface);
-  EXPECT_EQ(STATUS_SUCCESS, reply.status());
+  DefineSpaceReply reply;
+  ExecuteMethod(kDefineSpace, request, &reply, kTpmNvramInterface);
+  EXPECT_EQ(NVRAM_RESULT_SUCCESS, reply.result());
 }
 
-TEST_F(DBusServiceTest, DestroyNvram) {
+TEST_F(DBusServiceTest, DestroySpace) {
   uint32_t nvram_index = 5;
-  DestroyNvramRequest request;
+  DestroySpaceRequest request;
   request.set_index(nvram_index);
-  EXPECT_CALL(mock_nvram_service_, DestroyNvram(_, _))
+  EXPECT_CALL(mock_nvram_service_, DestroySpace(_, _))
       .WillOnce(Invoke([nvram_index](
-          const DestroyNvramRequest& request,
-          const TpmNvramInterface::DestroyNvramCallback& callback) {
+          const DestroySpaceRequest& request,
+          const TpmNvramInterface::DestroySpaceCallback& callback) {
         EXPECT_TRUE(request.has_index());
         EXPECT_EQ(nvram_index, request.index());
-        DestroyNvramReply reply;
-        reply.set_status(STATUS_SUCCESS);
+        DestroySpaceReply reply;
+        reply.set_result(NVRAM_RESULT_SUCCESS);
         callback.Run(reply);
       }));
-  DestroyNvramReply reply;
-  ExecuteMethod(kDestroyNvram, request, &reply, kTpmNvramInterface);
-  EXPECT_EQ(STATUS_SUCCESS, reply.status());
+  DestroySpaceReply reply;
+  ExecuteMethod(kDestroySpace, request, &reply, kTpmNvramInterface);
+  EXPECT_EQ(NVRAM_RESULT_SUCCESS, reply.result());
 }
 
-TEST_F(DBusServiceTest, WriteNvram) {
+TEST_F(DBusServiceTest, WriteSpace) {
   uint32_t nvram_index = 5;
   std::string nvram_data("nvram_data");
-  WriteNvramRequest request;
+  WriteSpaceRequest request;
   request.set_index(nvram_index);
   request.set_data(nvram_data);
-  EXPECT_CALL(mock_nvram_service_, WriteNvram(_, _))
+  EXPECT_CALL(mock_nvram_service_, WriteSpace(_, _))
       .WillOnce(Invoke([nvram_index, nvram_data](
-          const WriteNvramRequest& request,
-          const TpmNvramInterface::WriteNvramCallback& callback) {
+          const WriteSpaceRequest& request,
+          const TpmNvramInterface::WriteSpaceCallback& callback) {
         EXPECT_TRUE(request.has_index());
         EXPECT_EQ(nvram_index, request.index());
         EXPECT_TRUE(request.has_data());
         EXPECT_EQ(nvram_data, request.data());
-        WriteNvramReply reply;
-        reply.set_status(STATUS_SUCCESS);
+        WriteSpaceReply reply;
+        reply.set_result(NVRAM_RESULT_SUCCESS);
         callback.Run(reply);
       }));
-  WriteNvramReply reply;
-  ExecuteMethod(kWriteNvram, request, &reply, kTpmNvramInterface);
-  EXPECT_EQ(STATUS_SUCCESS, reply.status());
+  WriteSpaceReply reply;
+  ExecuteMethod(kWriteSpace, request, &reply, kTpmNvramInterface);
+  EXPECT_EQ(NVRAM_RESULT_SUCCESS, reply.result());
 }
 
-TEST_F(DBusServiceTest, ReadNvram) {
+TEST_F(DBusServiceTest, ReadSpace) {
   uint32_t nvram_index = 5;
   std::string nvram_data("nvram_data");
-  ReadNvramRequest request;
+  ReadSpaceRequest request;
   request.set_index(nvram_index);
-  EXPECT_CALL(mock_nvram_service_, ReadNvram(_, _))
+  EXPECT_CALL(mock_nvram_service_, ReadSpace(_, _))
       .WillOnce(Invoke([nvram_index, nvram_data](
-          const ReadNvramRequest& request,
-          const TpmNvramInterface::ReadNvramCallback& callback) {
+          const ReadSpaceRequest& request,
+          const TpmNvramInterface::ReadSpaceCallback& callback) {
         EXPECT_TRUE(request.has_index());
         EXPECT_EQ(nvram_index, request.index());
-        ReadNvramReply reply;
-        reply.set_status(STATUS_SUCCESS);
+        ReadSpaceReply reply;
+        reply.set_result(NVRAM_RESULT_SUCCESS);
         reply.set_data(nvram_data);
         callback.Run(reply);
       }));
-  ReadNvramReply reply;
-  ExecuteMethod(kReadNvram, request, &reply, kTpmNvramInterface);
-  EXPECT_EQ(STATUS_SUCCESS, reply.status());
+  ReadSpaceReply reply;
+  ExecuteMethod(kReadSpace, request, &reply, kTpmNvramInterface);
+  EXPECT_EQ(NVRAM_RESULT_SUCCESS, reply.result());
   EXPECT_TRUE(reply.has_data());
   EXPECT_EQ(nvram_data, reply.data());
 }
 
-TEST_F(DBusServiceTest, IsNvramDefined) {
+TEST_F(DBusServiceTest, LockSpace) {
   uint32_t nvram_index = 5;
-  bool nvram_defined = true;
-  IsNvramDefinedRequest request;
+  LockSpaceRequest request;
   request.set_index(nvram_index);
-  EXPECT_CALL(mock_nvram_service_, IsNvramDefined(_, _))
-      .WillOnce(Invoke([nvram_index, nvram_defined](
-          const IsNvramDefinedRequest& request,
-          const TpmNvramInterface::IsNvramDefinedCallback& callback) {
-        EXPECT_TRUE(request.has_index());
-        EXPECT_EQ(nvram_index, request.index());
-        IsNvramDefinedReply reply;
-        reply.set_status(STATUS_SUCCESS);
-        reply.set_is_defined(nvram_defined);
-        callback.Run(reply);
-      }));
-  IsNvramDefinedReply reply;
-  ExecuteMethod(kIsNvramDefined, request, &reply, kTpmNvramInterface);
-  EXPECT_EQ(STATUS_SUCCESS, reply.status());
-  EXPECT_TRUE(reply.has_is_defined());
-  EXPECT_EQ(nvram_defined, reply.is_defined());
+  request.set_lock_read(true);
+  request.set_lock_write(true);
+  EXPECT_CALL(mock_nvram_service_, LockSpace(_, _))
+      .WillOnce(Invoke(
+          [nvram_index](const LockSpaceRequest& request,
+                        const TpmNvramInterface::LockSpaceCallback& callback) {
+            EXPECT_TRUE(request.has_index());
+            EXPECT_EQ(nvram_index, request.index());
+            EXPECT_TRUE(request.lock_read());
+            EXPECT_TRUE(request.lock_write());
+            LockSpaceReply reply;
+            reply.set_result(NVRAM_RESULT_SUCCESS);
+            callback.Run(reply);
+          }));
+  LockSpaceReply reply;
+  ExecuteMethod(kLockSpace, request, &reply, kTpmNvramInterface);
+  EXPECT_EQ(NVRAM_RESULT_SUCCESS, reply.result());
 }
 
-TEST_F(DBusServiceTest, IsNvramLocked) {
-  uint32_t nvram_index = 5;
-  bool nvram_locked = true;
-  IsNvramLockedRequest request;
-  request.set_index(nvram_index);
-  EXPECT_CALL(mock_nvram_service_, IsNvramLocked(_, _))
-      .WillOnce(Invoke([nvram_index, nvram_locked](
-          const IsNvramLockedRequest& request,
-          const TpmNvramInterface::IsNvramLockedCallback& callback) {
-        EXPECT_TRUE(request.has_index());
-        EXPECT_EQ(nvram_index, request.index());
-        IsNvramLockedReply reply;
-        reply.set_status(STATUS_SUCCESS);
-        reply.set_is_locked(nvram_locked);
+TEST_F(DBusServiceTest, ListSpaces) {
+  constexpr uint32_t nvram_index_list[] = {3, 4, 5};
+  ListSpacesRequest request;
+  EXPECT_CALL(mock_nvram_service_, ListSpaces(_, _))
+      .WillOnce(Invoke([nvram_index_list](
+          const ListSpacesRequest& request,
+          const TpmNvramInterface::ListSpacesCallback& callback) {
+        ListSpacesReply reply;
+        reply.set_result(NVRAM_RESULT_SUCCESS);
+        for (auto index : nvram_index_list) {
+          reply.add_index_list(index);
+        }
         callback.Run(reply);
       }));
-  IsNvramLockedReply reply;
-  ExecuteMethod(kIsNvramLocked, request, &reply, kTpmNvramInterface);
-  EXPECT_EQ(STATUS_SUCCESS, reply.status());
-  EXPECT_TRUE(reply.has_is_locked());
-  EXPECT_EQ(nvram_locked, reply.is_locked());
+  ListSpacesReply reply;
+  ExecuteMethod(kListSpaces, request, &reply, kTpmNvramInterface);
+  EXPECT_EQ(NVRAM_RESULT_SUCCESS, reply.result());
+  EXPECT_EQ(arraysize(nvram_index_list), reply.index_list_size());
+  for (size_t i = 0; i < 3; i++) {
+    EXPECT_EQ(nvram_index_list[i], reply.index_list(i));
+  }
 }
 
-TEST_F(DBusServiceTest, GetNvramSize) {
+TEST_F(DBusServiceTest, GetSpaceInfo) {
   uint32_t nvram_index = 5;
   size_t nvram_size = 32;
-  GetNvramSizeRequest request;
+  GetSpaceInfoRequest request;
   request.set_index(nvram_index);
-  EXPECT_CALL(mock_nvram_service_, GetNvramSize(_, _))
+  EXPECT_CALL(mock_nvram_service_, GetSpaceInfo(_, _))
       .WillOnce(Invoke([nvram_index, nvram_size](
-          const GetNvramSizeRequest& request,
-          const TpmNvramInterface::GetNvramSizeCallback& callback) {
+          const GetSpaceInfoRequest& request,
+          const TpmNvramInterface::GetSpaceInfoCallback& callback) {
         EXPECT_TRUE(request.has_index());
         EXPECT_EQ(nvram_index, request.index());
-        GetNvramSizeReply reply;
-        reply.set_status(STATUS_SUCCESS);
+        GetSpaceInfoReply reply;
+        reply.set_result(NVRAM_RESULT_SUCCESS);
         reply.set_size(nvram_size);
+        reply.set_is_read_locked(true);
+        reply.set_is_write_locked(true);
         callback.Run(reply);
       }));
-  GetNvramSizeReply reply;
-  ExecuteMethod(kGetNvramSize, request, &reply, kTpmNvramInterface);
-  EXPECT_EQ(STATUS_SUCCESS, reply.status());
+  GetSpaceInfoReply reply;
+  ExecuteMethod(kGetSpaceInfo, request, &reply, kTpmNvramInterface);
+  EXPECT_EQ(NVRAM_RESULT_SUCCESS, reply.result());
   EXPECT_TRUE(reply.has_size());
   EXPECT_EQ(nvram_size, reply.size());
+  EXPECT_TRUE(reply.is_read_locked());
+  EXPECT_TRUE(reply.is_write_locked());
 }
 
 }  // namespace tpm_manager
