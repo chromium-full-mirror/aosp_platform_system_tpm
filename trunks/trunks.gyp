@@ -132,6 +132,7 @@
       'target_name': 'trunksd_lib',
       'type': 'static_library',
       'sources': [
+        'power_manager.cc',
         'resource_manager.cc',
         'tpm_handle.cc',
         'tpm_simulator_handle.cc',
@@ -140,6 +141,11 @@
       'dependencies': [
         'interface_proto',
       ],
+      'all_dependent_settings': {
+        'libraries': [
+          '-lsystem_api-power_manager-protos',
+        ],
+      },
     },
     {
       'target_name': 'trunksd',
@@ -186,6 +192,7 @@
             'hmac_session_test.cc',
             'password_authorization_delegate_test.cc',
             'policy_session_test.cc',
+            'power_manager_test.cc',
             'resource_manager_test.cc',
             'scoped_key_handle_test.cc',
             'session_manager_test.cc',
