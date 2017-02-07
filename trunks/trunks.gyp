@@ -188,6 +188,7 @@
           'includes': ['../../../../platform2/common-mk/common_test.gypi'],
           'sources': [
             'background_command_transceiver_test.cc',
+            'scoped_global_session_test.cc',
             'hmac_authorization_delegate_test.cc',
             'hmac_session_test.cc',
             'password_authorization_delegate_test.cc',
