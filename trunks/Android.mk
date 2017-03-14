@@ -203,7 +203,8 @@ LOCAL_SRC_FILES := \
   session_manager_test.cc \
   tpm_generated_test.cc \
   tpm_state_test.cc \
-  tpm_utility_test.cc
+  tpm_utility_test.cc \
+  trunks_factory_test.cc
 LOCAL_STATIC_LIBRARIES := \
   libBionicGtestMain \
   libgmock \
