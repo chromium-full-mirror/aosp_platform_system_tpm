@@ -131,6 +131,11 @@
     {
       'target_name': 'trunksd_lib',
       'type': 'static_library',
+      'variables': {
+        'deps': [
+          'libpower_manager-client',
+        ],
+      },
       'sources': [
         'power_manager.cc',
         'resource_manager.cc',
@@ -145,6 +150,11 @@
         'libraries': [
           '-lsystem_api-power_manager-protos',
         ],
+        'variables': {
+          'deps': [
+            'libpower_manager-client',
+          ],
+        },
       },
     },
     {
@@ -186,6 +196,11 @@
           'target_name': 'trunks_testrunner',
           'type': 'executable',
           'includes': ['../../../../platform2/common-mk/common_test.gypi'],
+          'variables': {
+            'deps': [
+              'libpower_manager-client-test',
+            ],
+          },
           'sources': [
             'background_command_transceiver_test.cc',
             'scoped_global_session_test.cc',
