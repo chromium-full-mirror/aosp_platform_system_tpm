@@ -23,6 +23,7 @@
 #include <base/strings/string_util.h>
 #include <base/sys_byteorder.h>
 #include <brillo/syslog_logging.h>
+#include <crypto/sha2.h>
 
 #include "trunks/trunks_dbus_proxy.h"
 
@@ -37,6 +38,7 @@ constexpr char kRaw[] = "raw";
 constexpr char kSetLock[] = "set_lock";
 constexpr char kSysInfo[] = "sysinfo";
 constexpr char kUpdate[] = "update";
+constexpr char kU2fCert[] = "u2f_cert";
 constexpr char kVerbose[] = "verbose";
 
 // Maximum image update block size expected by Cr50.
@@ -89,6 +91,7 @@ enum vendor_cmd_cc {
   VENDOR_CC_GET_LOCK = 16,
   VENDOR_CC_SET_LOCK = 17,
   VENDOR_CC_SYSINFO = 18,
+  VENDOR_CC_U2F_APDU = 27,
 };
 
 // The TPM response code is all zero for success.
@@ -621,6 +624,119 @@ static int VcSysInfo(TrunksDBusProxy* proxy, base::CommandLine* cl)
   return 0;
 }
 
+static int SendU2fApdu(TrunksDBusProxy* proxy,
+                       uint8_t ins,
+                       uint8_t p1,
+                       uint8_t p2,
+                       const std::string& payload,
+                       std::string* response) {
+  std::string out;
+  std::string header(5, 0);
+
+  header[1] = ins;
+  header[2] = p1;
+  header[3] = p2;
+  header[4] = payload.size();
+  std::string request = header + payload;
+  uint32_t rc = VendorCommand(proxy, VENDOR_CC_U2F_APDU, request, &out);
+  if (!rc) {
+    uint16_t sw = (out[out.length() - 2] << 8) | out[out.length() - 1];
+    *response = out.substr(0, out.length() - sizeof(uint16_t));
+    return sw;
+  }
+  return -rc;
+}
+
+static int VcU2fCert(TrunksDBusProxy* proxy, base::CommandLine* cl) {
+  const uint8_t kCmdU2fRegister = 0x01;
+  const uint8_t kCmdU2fVendorMode = 0xbf;
+  const uint8_t kG2fAttest = 0x80;
+  const uint8_t kSetMode = 1;
+  const uint8_t kU2fExtended = 3;
+  const uint16_t kSwNoError = 0x9000;
+
+  std::string resp;
+
+  // Send the mode to U2f + extensions
+  int sw = SendU2fApdu(proxy, kCmdU2fVendorMode, kSetMode, kU2fExtended,
+                       std::string(), &resp);
+  if (sw != kSwNoError) {
+    LOG(ERROR) << "Set U2F Mode failed SW=" << std::hex << sw;
+    return 1;
+  }
+  if (resp.length() < 1 || resp[0] != kU2fExtended) {
+    LOG(ERROR) << "Cannot set extended U2F Mode " << std::hex
+               << static_cast<int>(resp[0]);
+    return 1;
+  }
+
+  // Use the SHA-256 of the empty string if no parameter is passed.
+  std::string nonce(crypto::SHA256HashString(cl->GetSwitchValueASCII("nonce")));
+  std::string appid(crypto::SHA256HashString(cl->GetSwitchValueASCII("appid")));
+
+  std::string payload = nonce + appid;
+  sw = SendU2fApdu(proxy, kCmdU2fRegister, kG2fAttest, 0, payload, &resp);
+  if (sw != kSwNoError) {
+    LOG(ERROR) << "U2F Register failed  SW=" << std::hex << sw;
+    return 1;
+  }
+
+  // The response is:
+  // A reserved byte [1 byte], which for legacy reasons has the value 0x05.
+  // A user public key [65 bytes]. This is the (uncompressed) x,y-representation
+  //                               of a curve point on the P-256 elliptic curve.
+  // A key handle length byte [1 byte], which specifies the length of the key
+  //                                    handle (see below).
+  //                                    The value is unsigned (range 0-255).
+  // A key handle [length, see previous field]. This a handle that
+  //                                    allows the U2F token to identify the
+  //                                    generated key pair. U2F tokens may wrap
+  //                                    the generated private key and the
+  //                                    application id it was generated for,
+  //                                    and output that as the key handle.
+  // An attestation certificate [variable length]. This is a certificate in
+  //                                    X.509 DER format.
+  // A signature. This is a ECDSA signature (on P-256).
+  const int pkey_offset = 1;
+  const size_t pkey_size = 65;
+  const int handle_len_offset = pkey_offset + pkey_size;
+  const int handle_offset = handle_len_offset + 1;
+
+  LOG(INFO) << "PubKey:" << HexEncode(resp.substr(pkey_offset, pkey_size));
+  uint8_t handle_len = resp[handle_len_offset];
+  LOG(INFO) << "KeyHandle:"
+            << HexEncode(resp.substr(handle_offset, handle_len));
+  const int cert_offset = handle_offset + handle_len;
+  // parse the first tag of the certificate ASN.1 data to know its length.
+  std::string cert_seq_tag = resp.substr(cert_offset, 4);
+  // If we cannot find the size, do a safe bet and the certificate might
+  // have few trailing bytes from the signature which is harmless.
+  size_t cert_size = resp.size() - cert_offset - 32;
+  // Should be a Constructed Sequence ASN.1 tag else all bets are off,
+  // with the size taking 2 bytes (the certificate size is somewhere between
+  // 256B and 2KB).
+  if ((static_cast<uint8_t>(cert_seq_tag[0]) == (0x20 | 0x10)) &&
+      (static_cast<uint8_t>(cert_seq_tag[1]) == 0x82)) {
+    cert_size = static_cast<uint8_t>(cert_seq_tag[2]) << 8 |
+                static_cast<uint8_t>(cert_seq_tag[3]) + cert_seq_tag.size();
+  }
+
+  std::string cert = resp.substr(cert_offset, cert_size);
+  LOG(INFO) << "Cert:" << HexEncode(cert);
+  const int sig_offset = cert_offset + cert_size;
+  const size_t sig_size = resp.size() - sig_offset;
+  LOG(INFO) << "Signature(P256):"
+            << HexEncode(resp.substr(sig_offset, sig_size));
+
+  base::FilePath crt(cl->GetSwitchValuePath("crt"));
+  if (!crt.empty()) {
+    LOG(INFO) << "Certificate file " << crt.value();
+    base::WriteFile(crt, cert.data(), cert.size());
+  }
+
+  return 0;
+}
+
 int main(int argc, char** argv) {
   base::CommandLine::Init(argc, argv);
   brillo::InitLog(brillo::kLogToStderr);
@@ -647,6 +763,9 @@ int main(int argc, char** argv) {
 
   if (cl->HasSwitch(kSysInfo))
     return VcSysInfo(&proxy, cl);
+
+  if (cl->HasSwitch(kU2fCert))
+    return VcU2fCert(&proxy, cl);
 
   if (cl->HasSwitch(kUpdate))
     return HandleUpdate(&proxy, cl);
