@@ -196,6 +196,12 @@ class AttestationInterface {
       const SetSystemSaltRequest& request,
       const SetSystemSaltCallback& callback) = 0;
 
+  // Processes a GetEnrollmentId request and responds with GetEnrollmentIdReply.
+  using GetEnrollmentIdCallback =
+      base::Callback<void(const GetEnrollmentIdReply&)>;
+  virtual void GetEnrollmentId(
+      const GetEnrollmentIdRequest& request,
+      const GetEnrollmentIdCallback& callback) = 0;
 };
 
 }  // namespace attestation

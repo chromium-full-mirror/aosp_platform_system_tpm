@@ -20,6 +20,8 @@
 #include <base/callback.h>
 #include <base/message_loop/message_loop.h>
 #include <base/run_loop.h>
+#include <base/strings/string_number_conversions.h>
+#include <base/strings/string_util.h>
 #include <brillo/bind_lambda.h>
 #include <brillo/data_encoding.h>
 #include <brillo/http/http_transport_fake.h>
@@ -316,6 +318,10 @@ class AttestationServiceTest : public testing::Test {
   void WaitUntilIdleForTesting() {
     MessageLoopIdleEvent idle_event(service_->worker_thread_->message_loop());
     idle_event.Wait();
+  }
+
+  std::string ComputeEnterpriseEnrollmentId() {
+    return service_->ComputeEnterpriseEnrollmentId();
   }
 
   std::shared_ptr<brillo::http::fake::Transport> fake_http_transport_;

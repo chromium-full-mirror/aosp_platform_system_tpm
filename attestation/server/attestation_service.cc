@@ -2185,6 +2185,7 @@ void AttestationService::GetEnrollmentId(
 void AttestationService::GetEnrollmentIdTask(
     const GetEnrollmentIdRequest& request,
     const std::shared_ptr<GetEnrollmentIdReply>& result) {
+
   auto database_pb = database_->GetProtobuf();
   if (database_pb.has_identity_key() &&
       database_pb.identity_key().has_enrollment_id()) {
