@@ -352,7 +352,7 @@ static bool SetupConnection(TrunksDBusProxy* proxy,
   rpdu->backup_ro_offset = base::NetToHost32(rpdu->backup_ro_offset);
   rpdu->backup_rw_offset = base::NetToHost32(rpdu->backup_rw_offset);
 
-  for (int i = 0; i < arraysize(FirstResponsePdu::shv); i++) {
+  for (uint32_t i = 0; i < arraysize(FirstResponsePdu::shv); i++) {
     rpdu->shv[i].minor = base::NetToHost32(rpdu->shv[i].minor);
     rpdu->shv[i].major = base::NetToHost32(rpdu->shv[i].major);
     rpdu->shv[i].epoch = base::NetToHost32(rpdu->shv[i].epoch);
@@ -468,7 +468,7 @@ static int TransferImage(TrunksDBusProxy* proxy,
   //
 
   index = section_offsets[0] > section_offsets[1] ? 1 : 0;
-  for (int i = 0; i < arraysize(section_offsets); i++) {
+  for (uint32_t i = 0; i < arraysize(section_offsets); i++) {
     if (!TransferSection(proxy, update_image, section_offsets[index],
                          rpdu.shv[index], force)) {
       if (!force) {
