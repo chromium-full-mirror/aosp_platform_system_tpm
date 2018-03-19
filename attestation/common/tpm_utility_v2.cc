@@ -893,4 +893,16 @@ bool TpmUtilityV2::RemoveOwnerDependency() {
   return true;
 }
 
+bool TpmUtilityV2::GetEndorsementPublicKeyModulus(
+    KeyType key_type,
+    std::string* ekm) {
+  if (key_type == KEY_TYPE_RSA) {
+    return trunks_utility_->GetPublicRSAEndorsementKeyModulus(ekm) ==
+           TPM_RC_SUCCESS;
+  }
+
+  LOG(ERROR) << __func__ << ": Not implemented.";
+  return false;
+}
+
 }  // namespace attestation

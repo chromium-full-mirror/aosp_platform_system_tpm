@@ -1937,4 +1937,49 @@ TEST_F(AttestationServiceTest, SignEnterpriseChallengeBadPrefix) {
   Run();
 }
 
+TEST_F(AttestationServiceTest, ComputeEnterpriseEnrollmentId) {
+  EXPECT_CALL(mock_tpm_utility_, GetEndorsementPublicKeyModulus(_, _))
+      .WillRepeatedly(DoAll(SetArgPointee<1>(std::string("ekm")),
+                      Return(true)));
+  brillo::SecureBlob abe_data(0xCA, 32);
+  service_->set_abe_data(&abe_data);
+  CryptoUtilityImpl crypto_utility(&mock_tpm_utility_);
+  service_->set_crypto_utility(&crypto_utility);
+  std::string enrollment_id = ComputeEnterpriseEnrollmentId();
+  EXPECT_EQ(
+      "635c4526dfa583362273e2987944007b09131cfa0f4e5874e7a76d55d333e3cc",
+      base::ToLowerASCII(
+          base::HexEncode(enrollment_id.data(), enrollment_id.size())));
+}
+
+TEST_F(AttestationServiceTest, GetEnrollmentId) {
+  EXPECT_CALL(mock_tpm_utility_, GetEndorsementPublicKeyModulus(_, _))
+      .WillRepeatedly(DoAll(SetArgPointee<1>(std::string("ekm")),
+                      Return(true)));
+  brillo::SecureBlob abe_data(0xCA, 32);
+  service_->set_abe_data(&abe_data);
+  CryptoUtilityImpl crypto_utility(&mock_tpm_utility_);
+  service_->set_crypto_utility(&crypto_utility);
+  std::string enrollment_id = GetEnrollmentId();
+  EXPECT_EQ(
+      "635c4526dfa583362273e2987944007b09131cfa0f4e5874e7a76d55d333e3cc",
+      base::ToLowerASCII(
+          base::HexEncode(enrollment_id.data(), enrollment_id.size())));
+
+  // Cache the enrollment_id in the AIK.
+  AttestationDatabase database_pb;
+  EXPECT_CALL(mock_database_, GetProtobuf()).WillOnce(ReturnRef(database_pb));
+  auto aik = database_pb.mutable_identity_key();
+  aik->set_enrollment_id(enrollment_id);
+
+  // Change abe_data, and yet EID should remains the same.
+  brillo::SecureBlob abe_data_new(0x89, 32);
+  service_->set_abe_data(&abe_data_new);
+  enrollment_id = GetEnrollmentId();
+  EXPECT_EQ(
+      "635c4526dfa583362273e2987944007b09131cfa0f4e5874e7a76d55d333e3cc",
+      base::ToLowerASCII(
+          base::HexEncode(enrollment_id.data(), enrollment_id.size())));
+}
+
 }  // namespace attestation
