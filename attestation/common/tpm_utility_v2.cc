@@ -485,7 +485,7 @@ bool TpmUtilityV2::Unseal(const std::string& sealed_data, std::string* data) {
 bool TpmUtilityV2::GetEndorsementPublicKey(KeyType key_type,
                                            std::string* public_key) {
   if (key_type == KEY_TYPE_RSA) {
-    return trunks_utility_->GetPublicRSAEndorsementKey(public_key) ==
+    return trunks_utility_->GetPublicRSAEndorsementKeyModulus(public_key) ==
            TPM_RC_SUCCESS;
   }
 
